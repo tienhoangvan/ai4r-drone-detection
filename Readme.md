@@ -1,0 +1,1 @@
+ffmpeg -i videos/drone_02.mp4 -vf "fps=5" frames/drone_02/frame_%06d.jpg
