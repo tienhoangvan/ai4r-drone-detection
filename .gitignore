@@ -8,10 +8,10 @@ __pycache__/
 venv/
 
 # Data folders
-dataset/
-frames/
+#dataset/
+#frames/
 videos/
-store_CVAT/
+#store_CVAT/
 
 # Training outputs
 runs/
