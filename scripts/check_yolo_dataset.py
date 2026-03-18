@@ -10,15 +10,18 @@ EPS = 1e-6
 
 
 def is_image_file(p: Path) -> bool:
+    # Step: basic image file filter (extension + regular file)
     return p.is_file() and p.suffix.lower() in IMAGE_EXTS
 
 
 def read_yaml(yaml_path: Path) -> Dict:
+    # Step: load YOLO data.yaml (Ultralytics format)
     with yaml_path.open("r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 def resolve_dataset_paths(data_yaml_path: Path, data: Dict) -> Dict[str, Path]:
+    # Step: resolve base dataset path and split directories to absolute paths
     base = Path(data.get("path", data_yaml_path.parent)).expanduser()
     if not base.is_absolute():
         base = (data_yaml_path.parent / base).resolve()
@@ -35,6 +38,7 @@ def resolve_dataset_paths(data_yaml_path: Path, data: Dict) -> Dict[str, Path]:
 
 
 def image_label_pairs(images_dir: Path, labels_dir: Path) -> Tuple[List[Tuple[Path, Path]], List[Path], List[Path]]:
+    # Step: find (image, label) pairs + missing labels + orphan labels
     images = sorted([p for p in images_dir.iterdir() if is_image_file(p)]) if images_dir.exists() else []
     pairs = []
     missing_labels = []
@@ -54,6 +58,7 @@ def image_label_pairs(images_dir: Path, labels_dir: Path) -> Tuple[List[Tuple[Pa
 
 
 def validate_label_line(line: str, num_classes: int, line_no: int, file_path: Path) -> List[str]:
+    # Step: validate one YOLO label line: "cls x_center y_center width height" (all normalized)
     errors = []
     parts = line.strip().split()
 
@@ -63,7 +68,7 @@ def validate_label_line(line: str, num_classes: int, line_no: int, file_path: Pa
 
     cls_s, x_s, y_s, w_s, h_s = parts
 
-    # class
+    # Step: validate class id (must be an integer in [0, num_classes-1])
     try:
         cls_f = float(cls_s)
         cls_i = int(cls_f)
@@ -76,7 +81,7 @@ def validate_label_line(line: str, num_classes: int, line_no: int, file_path: Pa
     except ValueError:
         errors.append(f"{file_path}:{line_no} -> invalid class id: {cls_s}")
 
-    # bbox values
+    # Step: validate bbox fields as floats in [0,1] (with tolerance)
     vals = []
     for name, s in [("x_center", x_s), ("y_center", y_s), ("width", w_s), ("height", h_s)]:
         try:
@@ -98,7 +103,7 @@ def validate_label_line(line: str, num_classes: int, line_no: int, file_path: Pa
         if h <= EPS:
             errors.append(f"{file_path}:{line_no} -> height must be > 0, got {h}")
 
-        # Box boundary check with tolerance
+        # Step: boundary check (box corners must stay within [0,1] up to EPS)
         x_min = x - w / 2
         x_max = x + w / 2
         y_min = y - h / 2
@@ -114,11 +119,13 @@ def validate_label_line(line: str, num_classes: int, line_no: int, file_path: Pa
 
 
 def validate_label_file(label_path: Path, num_classes: int) -> Tuple[List[str], List[str]]:
+    # Step: validate one label file (hard errors + soft warnings)
     errors = []
     warnings = []
 
     text = label_path.read_text(encoding="utf-8").strip()
     if not text:
+        # Empty label files are allowed but reported as a warning
         warnings.append(f"{label_path} -> empty label file")
         return errors, warnings
 
@@ -131,7 +138,7 @@ def validate_label_file(label_path: Path, num_classes: int) -> Tuple[List[str], 
         line_errors = validate_label_line(line, num_classes, i, label_path)
         errors.extend(line_errors)
 
-        # soft warnings
+        # Step: soft warnings for unusually small/large boxes
         parts = line.split()
         if len(parts) == 5:
             _, _, _, w_s, h_s = parts
@@ -149,7 +156,7 @@ def validate_label_file(label_path: Path, num_classes: int) -> Tuple[List[str], 
 
 
 def infer_labels_dir(images_dir: Path) -> Path:
-    # images/train -> labels/train
+    # Step: infer labels directory from images directory (images/<split> -> labels/<split>)
     parts = list(images_dir.parts)
     if "images" in parts:
         idx = parts.index("images")
@@ -160,6 +167,7 @@ def infer_labels_dir(images_dir: Path) -> Path:
 
 
 def main() -> None:
+    # Step 1: Parse arguments (data.yaml path, print limits)
     parser = argparse.ArgumentParser(description="Check YOLO dataset integrity before training (v2 with tolerance)")
     parser.add_argument(
         "--data",
@@ -175,12 +183,14 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    # Step 2: Load and validate the data.yaml
     data_yaml = Path(args.data).resolve()
     if not data_yaml.exists():
         raise FileNotFoundError(f"data.yaml not found: {data_yaml}")
 
     data = read_yaml(data_yaml)
 
+    # Step 3: Extract class names and determine num_classes
     names = data.get("names", None)
     if names is None:
         raise ValueError("Missing 'names' in data.yaml")
@@ -196,6 +206,7 @@ def main() -> None:
     if num_classes == 0:
         raise ValueError("No classes found in data.yaml")
 
+    # Step 4: Resolve dataset split directories from data.yaml
     paths = resolve_dataset_paths(data_yaml, data)
 
     print("=== DATASET CHECK V2 ===")
@@ -211,6 +222,7 @@ def main() -> None:
     total_errors = []
     total_warnings = []
 
+    # Step 5: Iterate through each split and collect validation issues
     for split in ("train", "val", "test"):
         if split not in paths:
             continue
@@ -232,6 +244,7 @@ def main() -> None:
             total_errors.append(f"Missing labels directory: {labels_dir}")
             continue
 
+        # Step 5.1: Build pair lists and basic stats
         pairs, missing_labels, orphan_labels = image_label_pairs(images_dir, labels_dir)
 
         num_images = len([p for p in images_dir.iterdir() if is_image_file(p)])
@@ -251,11 +264,13 @@ def main() -> None:
         if orphan_labels:
             total_warnings.extend([f"Orphan label without image: {p}" for p in orphan_labels])
 
+        # Step 5.2: Validate each label file for this split
         for _, lbl in pairs:
             errors, warnings = validate_label_file(lbl, num_classes)
             total_errors.extend(errors)
             total_warnings.extend(warnings)
 
+    # Step 6: Print summary and (optionally) a capped list of issues
     print("\n=== SUMMARY ===")
     print(f"Total images         : {total_images}")
     print(f"Matched image-label  : {total_pairs}")

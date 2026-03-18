@@ -381,16 +381,16 @@ def auto_label(
 def main():
     args = parse_args()
 
-    # 1. Collect all images from given directories
+    # Step 1: Collect all images from the given directories
     images = collect_images(args.image_dirs, tuple(s.lower() for s in args.suffixes))
 
-    # 2. Select device (GPU if available, else CPU)
+    # Step 2: Select an inference device (GPU if available, else CPU)
     device = select_device()
 
-    # 3. Load YOLO model to the selected device
+    # Step 3: Load YOLO model onto the selected device
     model = load_model(args.model, device=device)
 
-    # 4. Run auto-labeling
+    # Step 4: Run batch auto-labeling and write YOLO .txt files next to images
     auto_label(
         model=model,
         images=images,
