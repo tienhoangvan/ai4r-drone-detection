@@ -34,8 +34,8 @@ from ultralytics import YOLO
 
 
 # -------- Default config values (you can override via CLI) -------- #
-DEFAULT_MODEL_PATH = "models/yolo26n.pt"
-DEFAULT_IMAGE_DIRS = ["frames/case01"]
+DEFAULT_MODEL_PATH = "../models/yolo26n_drone_r1_1.pt"
+DEFAULT_IMAGE_DIRS = ["../frames/drone_04"]
 DEFAULT_IMG_SUFFIXES = (".jpg", ".jpeg", ".png")
 DEFAULT_IMGSZ = 768
 DEFAULT_CONF = 0.30

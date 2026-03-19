@@ -1,354 +1,234 @@
-# AI4R – YOLO Drone Detection Pipeline
+🚀 AI4R – YOLO Drone Detection Pipeline (Full Iterative Workflow)
+🧠 Overview
 
-## 🚀 Overview
-
-This project implements a complete **end-to-end pipeline for drone detection using YOLO26**, following a real-world computer vision workflow.
+This project implements a complete real-world pipeline for drone detection using YOLO26, following a data-centric + iterative learning approach.
 
 Core idea:
 
-* Start with **manual labeling**
-* Train initial model using **transfer learning**
-* Use trained model to **auto-label new data**
-* Refine labels in CVAT
-* Retrain model
-* Repeat until performance is satisfactory
+Manual Label → Train → Auto Label → Refine → Retrain → Repeat
 
-👉 This is a **Human-in-the-loop + Iterative Learning pipeline**
+👉 This is a Human-in-the-loop + Iterative AI system
 
----
-
-## 📁 Project Structure
-
-```
+📁 Project Structure
 AI4R/
-├── frames/                  # Extracted frames from videos
-├── models/                  # YOLO pretrained & trained weights
-├── prepare_datasets/        # Intermediate dataset (raw from CVAT)
-├── dataset/                 # Final dataset for training YOLO
-├── runs/                    # Training outputs
-├── scripts/                 # All pipeline scripts
-├── store_CVAT/              # CVAT export/import
-├── videos/                  # Raw videos
+├── dataset/
+│   ├── drone_round1/
+│   ├── drone_round2/
+│   └── drone_merged/
+│
+├── frames/
+│
+├── models/
+│   ├── yolo26n.pt
+│   ├── yolo26n_drone_r1.pt
+│   └── yolo26n_drone_r2.pt
+│
+├── prepare_datasets/
+│   ├── round1/
+│   │   ├── images/
+│   │   └── labels/
+│   └── round2/
+│       ├── images/
+│       └── labels/
+│
+├── runs/detect/
+│   ├── train/
+│   ├── train-r1/
+│   └── train-r2/
+│
+├── scripts/
+│   ├── auto_label_yolo.py
+│   ├── build_yolo26_dataset.py
+│   ├── check_yolo_dataset.py
+│   ├── detection_image.py
+│   ├── detection_video.py
+│   ├── fix_yolo_label_bounds.py
+│   ├── merge_datasets_multi_round.py
+│   ├── split_data4cvat.py
+│   ├── train_optimized.py
+│   ├── train_simple.py
+│   └── yolo_to_coco.py
+│
+├── store_CVAT/
+│   ├── round1_*.zip
+│   └── round2_*.zip
+│
+├── videos/
+│
+├── .gitignore
 ├── Readme.md
-├── requirements.txt
-```
+└── requirements.txt
+🔁 FULL PIPELINE
+🟢 STEP 1 — Collect Video Data
 
----
+Put raw videos into:
 
-# 🔁 FULL PIPELINE
-
----
-
-## 🟢 STEP 1 — Collect Video Data
-
-Place videos into:
-
-```bash
 videos/
-```
+🟢 STEP 2 — Extract Frames
+ffmpeg -i videos/drone_01.mp4 -vf "fps=3" frames/drone_01/frame_%06d.jpg
+🔵 FIRST ITERATION (MANUAL LABELING)
+🟢 STEP 3 — Upload to CVAT (Manual Labeling)
 
----
+Create task (Object Detection)
 
-## 🟢 STEP 2 — Extract Frames from Video
+Upload images from:
 
-```bash
-cd scripts
-
-ffmpeg -i ../videos/drone_01.mp4 -vf "fps=3" ../frames/drone_01/frame_%06d.jpg
-```
-
----
-
-# 🔵 FIRST ITERATION (MANUAL LABELING)
-
----
-
-## 🟢 STEP 3 — Upload Images to CVAT (Manual Labeling)
-
-1. Open CVAT
-2. Create a new task → **Object Detection**
-3. Upload images from:
-
-```bash
 frames/drone_01/
-```
 
-4. Create label:
+Create label:
 
-```
 drone
-```
 
-5. Perform **manual annotation**
+Annotate manually
 
-👉 This step is critical to create the initial dataset.
+👉 Đây là bước quan trọng nhất
 
----
+🟢 STEP 4 — Export from CVAT
 
-## 🟢 STEP 4 — Export Dataset from CVAT
+Format:
 
-Export format:
-
-```
 YOLO 1.1
-```
 
 Save to:
 
-```bash
-store_CVAT/round1/
-```
+store_CVAT/round1_*.zip
+🟢 STEP 5 — Prepare Intermediate Dataset
+mkdir -p prepare_datasets/round1/images
+mkdir -p prepare_datasets/round1/labels
 
----
-
-## 🟢 STEP 5 — Build YOLO Training Dataset
-
-### 📌 5.1 Organize CVAT Export
-
-CVAT output is **raw YOLO 1.1 format**.
-
-Reorganize into intermediate dataset:
-
-```bash
-prepare_datasets/round1/
- ├── images/
- └── labels/
-```
-
-Copy data:
-
-```bash
-cp -r store_CVAT/round1/images/* prepare_datasets/round1/images/
-cp -r store_CVAT/round1/labels/* prepare_datasets/round1/labels/
-```
-
----
-
-### 📌 5.2 Convert to Training Dataset
-
-```bash
+unzip store_CVAT/round1_*.zip -d temp_round1
+cp -r temp_round1/images/* prepare_datasets/round1/images/
+cp -r temp_round1/labels/* prepare_datasets/round1/labels/
+🟢 STEP 6 — Build YOLO Training Dataset
 cd scripts
-python3 build_yolo26_dataset.py
-```
 
----
+python3 build_yolo26_dataset.py \
+    --input ../prepare_datasets/round1 \
+    --output ../dataset/drone_round1
+🟢 STEP 7 — Validate Dataset
+python3 check_yolo_dataset.py \
+    --data ../dataset/drone_round1/data.yaml
 
-### 📌 5.3 Output Dataset
+Fix nếu cần:
 
-```
-dataset/drone_round1/
- ├── images/
- │   ├── train/
- │   ├── val/
- │   └── test/
- ├── labels/
- │   ├── train/
- │   ├── val/
- │   └── test/
- └── data.yaml
-```
-
----
-
-### 📌 Key Pipeline
-
-```
-CVAT (YOLO 1.1)
-        ↓
-prepare_datasets/round1/   (raw intermediate)
-        ↓
-build_yolo26_dataset.py
-        ↓
-dataset/drone_round1/      (final training dataset)
-```
-
-👉 Only `dataset/drone_round1/` is used for training.
-
----
-
-## 🟢 STEP 6 — Validate Dataset
-
-```bash
-python3 check_yolo_dataset.py
-```
-
-Fix errors if needed:
-
-```bash
 python3 fix_yolo_label_bounds.py
-```
-
----
-
-## 🟢 STEP 7 — Train YOLO (Transfer Learning)
-
-```bash
-python3 train_simple.py
-```
+🟢 STEP 8 — Train Model (Round 1)
+python3 train_simple.py \
+    --model ../models/yolo26n.pt \
+    --data ../dataset/drone_round1/data.yaml \
+    --epochs 100 \
+    --batch 4
 
 Output:
 
-```
-runs/detect/train-*/weights/best.pt
-```
-
----
-
-## 🟢 STEP 8 — Evaluate Model
-
-```bash
+runs/detect/train-r1/
+🟢 STEP 9 — Evaluate Model
 python3 detection_image.py
 python3 detection_video.py
-```
+🔁 NEXT ITERATIONS (AUTO LABEL LOOP)
+🟡 STEP 10 — Extract New Frames
+ffmpeg -i videos/drone_02.mp4 -vf "fps=3" frames/drone_02/frame_%06d.jpg
+🟡 STEP 11 — Auto Label
+python3 auto_label_yolo.py \
+    --weights ../runs/detect/train-r1/weights/best.pt \
+    --source ../frames/drone_02 \
+    --output ../prepare_datasets/round2
+🟡 STEP 12 — Refine in CVAT
 
----
+Upload images + labels
 
-# 🔁 NEXT ITERATIONS (AUTO-LABEL LOOP)
+Fix:
 
----
+missing objects
 
-## 🟡 STEP 9 — Extract New Frames
+wrong bbox
 
-```bash
-ffmpeg -i ../videos/drone_02.mp4 -vf "fps=3" ../frames/drone_02/frame_%06d.jpg
-```
+false positives
 
----
+🟡 STEP 13 — Export Round 2
+store_CVAT/round2_*.zip
+🟡 STEP 14 — Prepare Round 2 Dataset
+mkdir -p prepare_datasets/round2/images
+mkdir -p prepare_datasets/round2/labels
 
-## 🟡 STEP 10 — Auto Label Using YOLO
-
-```bash
-python3 auto_label_yolo.py
-```
-
-👉 Generate labels automatically using trained model
-
----
-
-## 🟡 STEP 11 — Upload to CVAT (Refinement)
-
-1. Upload images + auto labels
-2. Review annotations
-3. Fix:
-
-   * missing drones
-   * incorrect bounding boxes
-   * false positives
-
-👉 Human correction is mandatory
-
----
-
-## 🟡 STEP 12 — Export Updated Dataset
-
-Export again:
-
-```
-YOLO 1.1
-```
-
-Save to:
-
-```bash
-store_CVAT/round2/
-```
-
----
-
-## 🟡 STEP 13 — Rebuild Dataset
-
-```bash
-python3 build_yolo26_dataset.py
-```
-
----
-
-## 🟡 STEP 14 — Validate Dataset
-
-```bash
-python3 check_yolo_dataset.py
-```
-
----
-
-## 🟡 STEP 15 — Retrain Model
-
-```bash
-python3 train_simple.py
-```
-
----
-
-# 🔁 ITERATION LOOP
-
-```
-Video → Frames → (Auto Label) → CVAT Refine
-      → Export → Build Dataset → Validate
-      → Train → Evaluate → Repeat
-```
-
----
-
-## ⚙️ Installation
-
-```bash
+unzip store_CVAT/round2_*.zip -d temp_round2
+cp -r temp_round2/images/* prepare_datasets/round2/images/
+cp -r temp_round2/labels/* prepare_datasets/round2/labels/
+🟡 STEP 15 — Build Dataset Round 2
+python3 build_yolo26_dataset.py \
+    --input ../prepare_datasets/round2 \
+    --output ../dataset/drone_round2
+🟡 STEP 16 — Merge Multi-Round Dataset
+python3 merge_datasets_multi_round.py \
+    --inputs ../dataset/drone_round1 ../dataset/drone_round2 \
+    --output ../dataset/drone_merged
+🟡 STEP 17 — Retrain (Round 2)
+python3 train_simple.py \
+    --model ../runs/detect/train-r1/weights/best.pt \
+    --data ../dataset/drone_merged/data.yaml \
+    --epochs 100 \
+    --batch 4
+🔁 ITERATION LOOP
+Video → Frames → Auto Label → CVAT Refine
+      → Build Dataset → Merge → Train → Evaluate → Repeat
+⚙️ Installation
 python3 -m venv venv
 source venv/bin/activate
 
 pip install -r requirements.txt
-```
+📊 Training Tips
 
----
+imgsz=640 → fast
 
-## 📊 Training Tips
+imgsz=960 → better for small drone
 
-* Use `imgsz=640` for low GPU
-* Use `imgsz=960` for better small-object detection
-* Reduce `batch` if CUDA OOM occurs
-* Always validate dataset before training
+batch nhỏ nếu GPU yếu
 
----
+luôn validate dataset trước khi train
 
-## 🧠 Key Concepts
+🧠 Key Concepts
 
-* Transfer Learning
-* Human-in-the-loop annotation
-* Iterative dataset improvement
-* Semi-automatic labeling
+Transfer Learning
 
----
+Data-Centric AI
 
-## 👨‍🏫 For Students
+Human-in-the-loop
+
+Iterative Training
+
+Semi-auto labeling
+
+👨‍🏫 For Students (VERY IMPORTANT)
 
 Follow strictly:
 
 1. Manual labeling FIRST
-2. Train model
+2. Train initial model
 3. Auto-label new data
-4. Refine in CVAT
-5. Retrain
+4. Fix labels in CVAT
+5. Merge datasets
+6. Retrain
+7. Repeat
 
-👉 This is how real-world AI systems are built.
+👉 Đây chính là cách build AI system ngoài thực tế
 
----
+📌 Notes
 
-## 📌 Notes
+Không push dataset lớn lên GitHub
 
-* Dataset is not included
-* Use your own videos
-* Large model files should not be pushed to GitHub
+Không push file .pt lớn (>100MB)
 
----
+Sử dụng .gitignore
 
-## 🔥 Future Work
+🔥 Extensions
 
-* Multi-class detection
-* Tracking (ByteTrack)
-* Real-time deployment
-* ROS2 integration
+Tracking (ByteTrack)
 
----
+ROS2 integration
 
-## 📎 License
+Real-time detection
 
+Multi-class detection
+
+📎 License
 Educational & research use only.

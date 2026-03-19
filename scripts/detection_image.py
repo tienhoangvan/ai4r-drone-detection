@@ -2,11 +2,11 @@ import cv2
 from ultralytics import YOLO
 
 # Step 1: Load the trained YOLO model (weights on disk)
-model = YOLO("../models/yolo26n_drone_r1_1.pt")
+model = YOLO("../models/yolo26n_drone_r2.pt")
 # model = YOLO("../models/yolo26n.pt")
 
 # Step 2: Read an input image from the dataset (BGR via OpenCV)
-image_path = "../dataset/drone_round1/images/test/frame_000389.jpg"
+image_path = "../dataset/drone_round2/images/test/r2_frame_000817.jpg"
 image = cv2.imread(image_path)
 
 # Step 3: Fail fast if the image cannot be loaded (wrong path / missing file)

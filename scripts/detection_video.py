@@ -2,8 +2,10 @@ import cv2
 
 from ultralytics import YOLO
 
+
+CONF_THRESHOLD = 0.5
 # Step 1: Load the trained YOLO model (weights on disk)
-model = YOLO("../models/yolo26n_drone_r1_1.pt")
+model = YOLO("../models/yolo26n_drone_r2.pt")
 
 # Step 2: Open an input video stream (file path)
 # video_path = "video_test/phantom_4_large.mp4"
@@ -18,8 +20,9 @@ while cap.isOpened():
 
     if success:
         # Step 3.2: Run inference on the current frame
-        results = model(frame)
-        
+        #results = model(frame)
+        results = model(frame, conf=CONF_THRESHOLD)
+
         # Step 3.3: Render predicted bounding boxes/labels on the frame
         annotated_frame = results[0].plot()
 

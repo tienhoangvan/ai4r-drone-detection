@@ -98,23 +98,23 @@ def write_data_yaml(out_root: Path, class_names: List[str]) -> Path:
 
 def main() -> None:
     # Step 1: Parse CLI arguments
-    parser = argparse.ArgumentParser(description="Build YOLO26 dataset from round1/images and round1/labels")
+    parser = argparse.ArgumentParser(description="Build YOLO26 dataset from round2/images and round2/labels")
     parser.add_argument(
         "--images-dir",
         type=str,
-        default="../prepare_datasets/round1/images",
+        default="../prepare_datasets/round2/images",
         help="Path to source images folder",
     )
     parser.add_argument(
         "--labels-dir",
         type=str,
-        default="../prepare_datasets/round1/labels",
+        default="../prepare_datasets/round2/labels",
         help="Path to source labels folder",
     )
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="../dataset/drone_round1",
+        default="../dataset/drone_round2",
         help="Path to output YOLO dataset folder",
     )
     parser.add_argument(
